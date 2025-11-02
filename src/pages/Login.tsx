@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { login, isAuthenticated } from '@/store/authStore';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { apiLogin, apiMe } from '@/lib/api';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
+import { Home } from 'lucide-react';
 
 const Login = () => {
   const { toast } = useToast();
@@ -13,23 +14,55 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  if (isAuthenticated()) {
-    return <Navigate to="/admin" replace />;
+  const [checking, setChecking] = useState(true);
+  useEffect(() => {
+    (async () => {
+      try {
+        const me = await apiMe();
+        if (me?.user && me.user.role === 'admin') {
+          navigate('/admin', { replace: true });
+        }
+      } catch (error) {
+        // User is not authenticated, show login form
+      } finally {
+        setChecking(false);
+      }
+    })();
+  }, [navigate]);
+  
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    );
   }
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const ok = login(email.trim(), password);
-    if (ok) {
-      toast({ title: 'Welcome' });
-      navigate('/admin', { replace: true });
-    } else {
+    try {
+      const response = await apiLogin(email.trim(), password);
+      if (response.user?.isAdmin) {
+        toast({ title: 'Welcome' });
+        navigate('/admin', { replace: true });
+      } else {
+        toast({ title: 'Access denied. Admin privileges required.', variant: 'destructive' });
+      }
+    } catch (e) {
       toast({ title: 'Invalid credentials', variant: 'destructive' });
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
+    <div className="min-h-screen flex items-center justify-center p-6 relative">
+      <div className="absolute top-20 left-4 z-50">
+        <Link to="/">
+          <Button variant="outline" size="sm">
+            <Home className="w-4 h-4 mr-2" />
+            Home
+          </Button>
+        </Link>
+      </div>
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Admin Login</CardTitle>

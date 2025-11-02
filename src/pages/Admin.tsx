@@ -7,9 +7,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Job } from '@/types/job';
 import { getSettings, JobsSettings, loadJobs, saveJobs, saveSettings, upsertJobs } from '@/store/jobsStore';
-import { getCurrentUser, logout } from '@/store/authStore';
+import { getCurrentUser } from '@/store/authStore';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { refreshFromCsvSource } from '@/lib/sources';
+import { useNavigate } from 'react-router-dom';
+import { Home } from 'lucide-react';
+import { apiLogout } from '@/lib/api';
 
 function parseCsv(text: string): Job[] {
   // Minimal CSV parser for simple admin use: expects header names matching Job keys
@@ -51,10 +54,12 @@ function parseCsv(text: string): Job[] {
 
 const Admin = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [csvText, setCsvText] = useState('');
   const [csvFileName, setCsvFileName] = useState('');
   const [settings, setSettings] = useState<JobsSettings>(() => getSettings());
-  const existingJobs = useMemo(() => loadJobs(), []);
+  const [jobsVersion, setJobsVersion] = useState(0);
+  const existingJobs = useMemo(() => loadJobs(), [jobsVersion]);
 
   const [manual, setManual] = useState({
     title: '',
@@ -64,9 +69,13 @@ const Admin = () => {
     salary: '',
     jobType: 'Full-time' as Job['jobType'],
     description: '',
+    requirements: '',
+    responsibilities: '',
     contactEmail: '',
     contactWhatsApp: ''
   });
+
+  const [editingJob, setEditingJob] = useState<Job | null>(null);
 
   const handleCsvImport = () => {
     const parsed = parseCsv(csvText);
@@ -99,26 +108,69 @@ const Admin = () => {
       toast({ title: 'Missing fields', description: 'Please fill required fields', variant: 'destructive' });
       return;
     }
+    const requirementsArray = manual.requirements ? manual.requirements.split('\n').map(r => r.trim()).filter(Boolean) : [];
+    const responsibilitiesArray = manual.responsibilities ? manual.responsibilities.split('\n').map(r => r.trim()).filter(Boolean) : [];
+    
     const newJob: Job = {
-      id: `${Date.now()}`,
+      id: editingJob?.id || `${Date.now()}`,
       title: manual.title,
       company: manual.company,
       location: manual.location,
       experience: manual.experience,
       salary: manual.salary || undefined,
-      datePosted: new Date(),
+      datePosted: editingJob?.datePosted || new Date(),
       jobType: manual.jobType,
       description: manual.description,
-      requirements: [],
-      responsibilities: [],
+      requirements: requirementsArray,
+      responsibilities: responsibilitiesArray,
       contactEmail: manual.contactEmail || undefined,
       contactWhatsApp: manual.contactWhatsApp || undefined
     };
     const merged = upsertJobs(loadJobs(), [newJob]);
     saveJobs(merged);
-    toast({ title: 'Job added' });
+    toast({ title: editingJob ? 'Job updated' : 'Job added' });
     setManual({
-      title: '', company: '', location: '', experience: '', salary: '', jobType: 'Full-time', description: '', contactEmail: '', contactWhatsApp: ''
+      title: '', company: '', location: '', experience: '', salary: '', jobType: 'Full-time', description: '', requirements: '', responsibilities: '', contactEmail: '', contactWhatsApp: ''
+    });
+    setEditingJob(null);
+    setJobsVersion(v => v + 1);
+  };
+
+  const handleEditJob = (job: Job) => {
+    setEditingJob(job);
+    setManual({
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      experience: job.experience,
+      salary: job.salary || '',
+      jobType: job.jobType,
+      description: job.description,
+      requirements: job.requirements.join('\n'),
+      responsibilities: job.responsibilities.join('\n'),
+      contactEmail: job.contactEmail || '',
+      contactWhatsApp: job.contactWhatsApp || ''
+    });
+    // Scroll to the "Add Job Manually" section
+    const addJobSection = document.getElementById('add-job-manually');
+    if (addJobSection) {
+      addJobSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const handleDeleteJob = (jobId: string) => {
+    if (!confirm('Are you sure you want to delete this job?')) return;
+    const jobs = loadJobs();
+    const filtered = jobs.filter(j => j.id !== jobId);
+    saveJobs(filtered);
+    toast({ title: 'Job deleted' });
+    setJobsVersion(v => v + 1);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingJob(null);
+    setManual({
+      title: '', company: '', location: '', experience: '', salary: '', jobType: 'Full-time', description: '', requirements: '', responsibilities: '', contactEmail: '', contactWhatsApp: ''
     });
   };
 
@@ -132,8 +184,20 @@ const Admin = () => {
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">Signed in as {user?.email}</div>
-        <Button variant="outline" onClick={() => { logout(); window.location.href = '/login'; }}>Logout</Button>
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={async () => {
+              await apiLogout();
+              navigate('/', { replace: true });
+            }}
+          >
+            <Home className="w-4 h-4 mr-2" />
+            Home
+          </Button>
+          <div className="text-sm text-muted-foreground">Signed in as {user?.email}</div>
+        </div>
       </div>
       <Card>
         <CardHeader>
@@ -179,10 +243,10 @@ const Admin = () => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card id="add-job-manually">
         <CardHeader>
-          <CardTitle>Add Job Manually</CardTitle>
-          <CardDescription>Use this form to add a single job posting.</CardDescription>
+          <CardTitle>{editingJob ? 'Edit Job' : 'Add Job Manually'}</CardTitle>
+          <CardDescription>{editingJob ? 'Update the job details below.' : 'Use this form to add a single job posting.'}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -224,6 +288,24 @@ const Admin = () => {
               <Label>Description *</Label>
               <Textarea rows={5} value={manual.description} onChange={(e) => setManual(s => ({ ...s, description: e.target.value }))} />
             </div>
+            <div className="md:col-span-4 space-y-2">
+              <Label>Requirements</Label>
+              <Textarea 
+                rows={4} 
+                value={manual.requirements} 
+                onChange={(e) => setManual(s => ({ ...s, requirements: e.target.value }))}
+                placeholder="Enter each requirement on a new line&#10;e.g.,&#10;Bachelor's degree in Computer Science&#10;3+ years of experience&#10;Knowledge of React"
+              />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <Label>Responsibilities</Label>
+              <Textarea 
+                rows={4} 
+                value={manual.responsibilities} 
+                onChange={(e) => setManual(s => ({ ...s, responsibilities: e.target.value }))}
+                placeholder="Enter each responsibility on a new line&#10;e.g.,&#10;Develop and maintain web applications&#10;Collaborate with cross-functional teams&#10;Write clean and efficient code"
+              />
+            </div>
             <div className="space-y-2">
               <Label>Email</Label>
               <Input value={manual.contactEmail} onChange={(e) => setManual(s => ({ ...s, contactEmail: e.target.value }))} placeholder="hr@company.com" />
@@ -233,13 +315,44 @@ const Admin = () => {
               <Input value={manual.contactWhatsApp} onChange={(e) => setManual(s => ({ ...s, contactWhatsApp: e.target.value }))} placeholder="+1234567890" />
             </div>
           </div>
-          <div className="pt-2">
-            <Button className="w-full" onClick={handleManualAdd}>Add Job</Button>
+          <div className="pt-2 flex gap-2">
+            {editingJob && (
+              <Button variant="outline" className="w-full" onClick={handleCancelEdit}>Cancel</Button>
+            )}
+            <Button className="w-full" onClick={handleManualAdd}>{editingJob ? 'Update Job' : 'Add Job'}</Button>
           </div>
         </CardContent>
       </Card>
 
-      <div className="text-sm text-muted-foreground">Current jobs in store: {existingJobs.length}</div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Existing Jobs ({existingJobs.length})</CardTitle>
+          <CardDescription>View and edit jobs listed on the website.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {existingJobs.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No jobs found. Add jobs using the form above or import CSV.</p>
+          ) : (
+            <div className="space-y-4">
+              {existingJobs.map((job) => (
+                <div key={job.id} className="border rounded-lg p-4 space-y-2">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-lg">{job.title}</h3>
+                      <p className="text-sm text-muted-foreground">{job.company} • {job.location}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{job.jobType} • {job.experience}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => handleEditJob(job)}>Edit</Button>
+                      <Button size="sm" variant="destructive" onClick={() => handleDeleteJob(job.id)}>Delete</Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
