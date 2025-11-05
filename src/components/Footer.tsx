@@ -10,22 +10,22 @@ const Footer = () => {
           <div>
             <h3 className="font-semibold mb-4">Follow us</h3>
             <div className="flex flex-col gap-2">
-              <a href="https://www.linkedin.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+              <a href="https://www.linkedin.com/company/job-vault25/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
                 <Linkedin className="w-4 h-4" />
                 LinkedIn
               </a>
-              <a href="https://www.instagram.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+              <a href=" https://www.instagram.com/job_vault?igsh=MWNldGtiMjEyeTZ2ZQ%3D%3D&utm_source=qr" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
                 <Instagram className="w-4 h-4" />
                 Instagram
               </a>
-              <a href="https://t.me" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+              {/* <a href="https://t.me" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
                 <Send className="w-4 h-4" />
                 Telegram
-              </a>
-              <a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+              </a> */}
+              {/* <a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
                 <Youtube className="w-4 h-4" />
                 YouTube
-              </a>
+              </a> */}
             </div>
           </div>
 
@@ -33,18 +33,18 @@ const Footer = () => {
           <div>
             <h3 className="font-semibold mb-4">Community</h3>
             <div className="flex flex-col gap-2">
-              <a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+              <a href="https://chat.whatsapp.com/KCVIy6e6yPG24EaF5BjHPx?mode=wwt" className="text-sm text-muted-foreground hover:text-primary transition-colors">
                 Join our WhatsApp
               </a>
-              <Link to="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+              {/* <Link to="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
                 Jobs based on CV
-              </Link>
-              <Link to="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+              </Link> */}
+              {/* <Link to="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
                 Blogs
-              </Link>
-              <Link to="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+              </Link> */}
+              {/* <Link to="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
                 Testimonials
-              </Link>
+              </Link> */}
             </div>
           </div>
 
@@ -52,10 +52,10 @@ const Footer = () => {
           <div>
             <h3 className="font-semibold mb-4">Legal</h3>
             <div className="flex flex-col gap-2">
-              <Link to="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+              <Link to="/terms" className="text-sm text-muted-foreground hover:text-primary transition-colors">
                 Terms of Service
               </Link>
-              <Link to="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+              <Link to="/privacy" className="text-sm text-muted-foreground hover:text-primary transition-colors">
                 Privacy Policy
               </Link>
             </div>

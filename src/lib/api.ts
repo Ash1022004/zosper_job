@@ -38,6 +38,7 @@ export interface ApiUser {
   id: number;
   email: string;
   name?: string;
+  mobile?: string;
   isAdmin?: boolean;
 }
 
@@ -64,12 +65,12 @@ async function api<T>(endpoint: string, options?: RequestInit): Promise<T> {
 }
 
 export const authApi = {
-  register: async (email: string, password: string, name?: string): Promise<AuthResponse> => {
+  register: async (email: string, password: string, name: string, mobile: string): Promise<AuthResponse> => {
     const res = await fetch(`${API_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ email, password, name }),
+      body: JSON.stringify({ email, password, name, mobile }),
     });
     if (!res.ok) {
       const error = await res.json().catch(() => ({ error: res.statusText }));
@@ -105,6 +106,26 @@ export const feedbackApi = {
       method: 'POST',
       body: JSON.stringify({ email, message }),
     }),
+};
+
+export const analyticsApi = {
+  trackApplication: async (jobId: string, jobTitle: string, company: string) => {
+    const res = await fetch(`${API_URL}/api/analytics/application`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ jobId, jobTitle, company }),
+    });
+    if (!res.ok) throw new Error('Failed to track application');
+    return res.json();
+  },
+  getSummary: async () => {
+    const res = await fetch(`${API_URL}/api/analytics/summary`, {
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to get analytics');
+    return res.json();
+  },
 };
 
 import { Job } from '@/types/job';

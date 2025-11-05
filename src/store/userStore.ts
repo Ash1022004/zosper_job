@@ -1,6 +1,7 @@
 export interface AppUser {
   email: string;
   name?: string;
+  mobile?: string;
 }
 
 const KEY = 'djp.user.v1';

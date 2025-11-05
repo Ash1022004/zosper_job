@@ -11,6 +11,7 @@ export interface Job {
   requirements: string[];
   responsibilities: string[];
   benefits?: string[];
+  applyUrl?: string; // External application link or Google Form
   contactEmail?: string;
   contactWhatsApp?: string;
   companyLogo?: string;

@@ -9,9 +9,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { MapPin, Briefcase, Calendar, DollarSign, Mail, Share2, MessageCircle } from 'lucide-react';
+import { MapPin, Briefcase, Calendar, DollarSign, Mail, Share2, MessageCircle, Lock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
+import { getUser } from '@/store/userStore';
+import { useNavigate } from 'react-router-dom';
+import { analyticsApi } from '@/lib/api';
 
 interface JobDetailModalProps {
   job: Job | null;
@@ -21,9 +24,25 @@ interface JobDetailModalProps {
 
 export const JobDetailModal = ({ job, open, onOpenChange }: JobDetailModalProps) => {
   if (!job) return null;
+  const user = getUser();
+  const navigate = useNavigate();
 
-  const handleApply = () => {
-    if (job.contactEmail) {
+  const handleApply = async () => {
+    if (!user) {
+      toast.error('Please login to view contact details');
+      navigate('/user-login');
+      onOpenChange(false);
+      return;
+    }
+    // Track application
+    try {
+      await analyticsApi.trackApplication(job.id, job.title, job.company);
+    } catch (error) {
+      console.error('Failed to track application:', error);
+    }
+    if (job.applyUrl) {
+      window.open(job.applyUrl, '_blank');
+    } else if (job.contactEmail) {
       window.location.href = `mailto:${job.contactEmail}?subject=Application for ${job.title}`;
     } else if (job.contactWhatsApp) {
       window.open(`https://wa.me/${job.contactWhatsApp.replace(/[^0-9]/g, '')}`, '_blank');
@@ -130,20 +149,45 @@ export const JobDetailModal = ({ job, open, onOpenChange }: JobDetailModalProps)
 
           <div>
             <h3 className="text-lg font-semibold mb-3 text-foreground">Contact Information</h3>
-            <div className="space-y-2">
-              {job.contactEmail && (
+            {user ? (
+              <div className="space-y-2">
+                {job.contactEmail && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Mail className="w-4 h-4 text-primary" />
+                    <span>{job.contactEmail}</span>
+                  </div>
+                )}
+                {job.contactWhatsApp && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <MessageCircle className="w-4 h-4 text-secondary" />
+                    <span>{job.contactWhatsApp}</span>
+                  </div>
+                )}
+                {!job.contactEmail && !job.contactWhatsApp && (
+                  <p className="text-sm text-muted-foreground">No contact information available for this job.</p>
+                )}
+              </div>
+            ) : (
+              <div className="border rounded-lg p-4 bg-muted/50 space-y-3">
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <Mail className="w-4 h-4 text-primary" />
-                  <span>{job.contactEmail}</span>
+                  <Lock className="w-5 h-5 text-primary" />
+                  <span className="font-medium">Login Required</span>
                 </div>
-              )}
-              {job.contactWhatsApp && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <MessageCircle className="w-4 h-4 text-secondary" />
-                  <span>{job.contactWhatsApp}</span>
-                </div>
-              )}
-            </div>
+                <p className="text-sm text-muted-foreground">
+                  Please login to view contact details of the recruiter.
+                </p>
+                <Button 
+                  onClick={() => {
+                    onOpenChange(false);
+                    navigate('/user-login');
+                  }}
+                  className="w-full"
+                  size="sm"
+                >
+                  Sign in to View Contacts
+                </Button>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3 pt-4">

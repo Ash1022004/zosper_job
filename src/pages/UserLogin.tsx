@@ -15,6 +15,7 @@ const UserLogin = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [mobile, setMobile] = useState('');
   const [isRegister, setIsRegister] = useState(false);
 
   if (getUser()) return <Navigate to="/" replace />;
@@ -22,11 +23,15 @@ const UserLogin = () => {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      if (isRegister) {
+        if (!name.trim()) throw new Error('Name is required');
+        if (!mobile.trim()) throw new Error('Mobile number is required');
+      }
       const res = isRegister
-        ? await authApi.register(email.trim(), password, name.trim() || undefined)
+        ? await authApi.register(email.trim(), password, name.trim(), mobile.trim())
         : await authApi.login(email.trim(), password);
       localStorage.setItem('token', res.token);
-      setUser({ email: res.user.email, name: res.user.name });
+      setUser({ email: res.user.email, name: res.user.name, mobile: res.user.mobile });
       toast({ title: isRegister ? 'Account created!' : 'Signed in' });
       navigate('/', { replace: true });
     } catch (error: any) {
@@ -52,10 +57,16 @@ const UserLogin = () => {
         <CardContent>
           <form className="space-y-4" onSubmit={onSubmit}>
             {isRegister && (
-              <div className="space-y-2">
-                <Label htmlFor="name">Name (optional)</Label>
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
-              </div>
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required={isRegister} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="mobile">Mobile</Label>
+                  <Input id="mobile" value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="e.g., +91 98765 43210" required={isRegister} />
+                </div>
+              </>
             )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>

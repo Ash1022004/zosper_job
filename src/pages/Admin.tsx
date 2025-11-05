@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,12 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { refreshFromCsvSource } from '@/lib/sources';
 import { useNavigate } from 'react-router-dom';
 import { Home } from 'lucide-react';
-import { apiLogout } from '@/lib/api';
+import { apiLogout, analyticsApi } from '@/lib/api';
 
 function parseCsv(text: string): Job[] {
   // Minimal CSV parser for simple admin use: expects header names matching Job keys
   // Required: id,title,company,location,experience,datePosted,jobType,description
-  // Optional: salary,benefits (| separated),requirements (|),responsibilities (|),contactEmail,contactWhatsApp,companyLogo
+  // Optional: salary,benefits (| separated),requirements (|),responsibilities (|),applyUrl,contactEmail,contactWhatsApp,companyLogo
   const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
   if (lines.length < 2) return [];
   const header = lines[0].split(',').map(h => h.trim());
@@ -42,12 +42,13 @@ function parseCsv(text: string): Job[] {
     const benefits = get(parts, 'benefits') ? get(parts, 'benefits').split('|').map(s => s.trim()).filter(Boolean) : undefined;
     const requirements = get(parts, 'requirements') ? get(parts, 'requirements').split('|').map(s => s.trim()).filter(Boolean) : [];
     const responsibilities = get(parts, 'responsibilities') ? get(parts, 'responsibilities').split('|').map(s => s.trim()).filter(Boolean) : [];
+    const applyUrl = get(parts, 'applyUrl') || undefined;
     const contactEmail = get(parts, 'contactEmail') || undefined;
     const contactWhatsApp = get(parts, 'contactWhatsApp') || undefined;
     const companyLogo = get(parts, 'companyLogo') || undefined;
     const datePosted = new Date(dateStr);
     if (isNaN(datePosted.getTime())) continue;
-    jobs.push({ id, title, company, location, experience, salary: salary || undefined, datePosted, jobType, description, requirements, responsibilities, benefits, contactEmail, contactWhatsApp, companyLogo });
+    jobs.push({ id, title, company, location, experience, salary: salary || undefined, datePosted, jobType, description, requirements, responsibilities, benefits, applyUrl, contactEmail, contactWhatsApp, companyLogo });
   }
   return jobs;
 }
@@ -60,6 +61,8 @@ const Admin = () => {
   const [settings, setSettings] = useState<JobsSettings>(() => getSettings());
   const [jobsVersion, setJobsVersion] = useState(0);
   const existingJobs = useMemo(() => loadJobs(), [jobsVersion]);
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
   const [manual, setManual] = useState({
     title: '',
@@ -71,11 +74,29 @@ const Admin = () => {
     description: '',
     requirements: '',
     responsibilities: '',
+    applyUrl: '',
     contactEmail: '',
     contactWhatsApp: ''
   });
 
   const [editingJob, setEditingJob] = useState<Job | null>(null);
+
+  useEffect(() => {
+    loadAnalytics();
+  }, []);
+
+  const loadAnalytics = async () => {
+    setLoadingAnalytics(true);
+    try {
+      const data = await analyticsApi.getSummary();
+      setAnalytics(data);
+    } catch (error) {
+      console.error('Failed to load analytics:', error);
+      toast({ title: 'Failed to load analytics', variant: 'destructive' });
+    } finally {
+      setLoadingAnalytics(false);
+    }
+  };
 
   const handleCsvImport = () => {
     const parsed = parseCsv(csvText);
@@ -123,6 +144,7 @@ const Admin = () => {
       description: manual.description,
       requirements: requirementsArray,
       responsibilities: responsibilitiesArray,
+      applyUrl: manual.applyUrl || undefined,
       contactEmail: manual.contactEmail || undefined,
       contactWhatsApp: manual.contactWhatsApp || undefined
     };
@@ -130,7 +152,7 @@ const Admin = () => {
     saveJobs(merged);
     toast({ title: editingJob ? 'Job updated' : 'Job added' });
     setManual({
-      title: '', company: '', location: '', experience: '', salary: '', jobType: 'Full-time', description: '', requirements: '', responsibilities: '', contactEmail: '', contactWhatsApp: ''
+      title: '', company: '', location: '', experience: '', salary: '', jobType: 'Full-time', description: '', requirements: '', responsibilities: '', applyUrl: '', contactEmail: '', contactWhatsApp: ''
     });
     setEditingJob(null);
     setJobsVersion(v => v + 1);
@@ -148,6 +170,7 @@ const Admin = () => {
       description: job.description,
       requirements: job.requirements.join('\n'),
       responsibilities: job.responsibilities.join('\n'),
+      applyUrl: job.applyUrl || '',
       contactEmail: job.contactEmail || '',
       contactWhatsApp: job.contactWhatsApp || ''
     });
@@ -170,7 +193,7 @@ const Admin = () => {
   const handleCancelEdit = () => {
     setEditingJob(null);
     setManual({
-      title: '', company: '', location: '', experience: '', salary: '', jobType: 'Full-time', description: '', requirements: '', responsibilities: '', contactEmail: '', contactWhatsApp: ''
+      title: '', company: '', location: '', experience: '', salary: '', jobType: 'Full-time', description: '', requirements: '', responsibilities: '', applyUrl: '', contactEmail: '', contactWhatsApp: ''
     });
   };
 
@@ -243,6 +266,128 @@ const Admin = () => {
         </CardContent>
       </Card>
 
+      {/* Analytics Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>User Analytics</CardTitle>
+          <CardDescription>View user activity, logins, and job applications</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingAnalytics ? (
+            <div className="text-center py-8 text-muted-foreground">Loading analytics...</div>
+          ) : analytics ? (
+            <div className="space-y-6">
+              {/* Summary Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="border rounded-lg p-4">
+                  <div className="text-2xl font-bold">{analytics.totalUsers}</div>
+                  <div className="text-sm text-muted-foreground">Total Users</div>
+                </div>
+                <div className="border rounded-lg p-4">
+                  <div className="text-2xl font-bold">{analytics.uniqueLoggedInUsers}</div>
+                  <div className="text-sm text-muted-foreground">Logged In Users</div>
+                </div>
+                <div className="border rounded-lg p-4">
+                  <div className="text-2xl font-bold">{analytics.totalLogins}</div>
+                  <div className="text-sm text-muted-foreground">Total Logins</div>
+                  <div className="text-xs text-muted-foreground mt-1">{analytics.recentLogins} in last 30 days</div>
+                </div>
+                <div className="border rounded-lg p-4">
+                  <div className="text-2xl font-bold">{analytics.totalApplications}</div>
+                  <div className="text-sm text-muted-foreground">Total Applications</div>
+                  <div className="text-xs text-muted-foreground mt-1">{analytics.recentApplications} in last 30 days</div>
+                </div>
+              </div>
+
+              {/* Most Applied Jobs */}
+              {analytics.applicationsByJob.length > 0 && (
+                <div>
+                  <h3 className="font-semibold mb-3">Most Applied Jobs</h3>
+                  <div className="space-y-2">
+                    {analytics.applicationsByJob.slice(0, 10).map((job: any, index: number) => (
+                      <div key={job.jobId} className="border rounded-lg p-3 flex justify-between items-center">
+                        <div>
+                          <div className="font-medium">{job.jobTitle}</div>
+                          <div className="text-sm text-muted-foreground">{job.company}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-bold">{job.count}</div>
+                          <div className="text-xs text-muted-foreground">applications</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* User Application History */}
+              {analytics.userApplications.length > 0 && (
+                <div>
+                  <h3 className="font-semibold mb-3">User Application History</h3>
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {analytics.userApplications.map((userApp: any) => (
+                      <div key={userApp.userId} className="border rounded-lg p-3">
+                        <div className="font-medium mb-2">{userApp.email}</div>
+                        <div className="text-sm text-muted-foreground">
+                          Applied to {userApp.applications.length} job(s):
+                        </div>
+                        <ul className="mt-2 space-y-1">
+                          {userApp.applications.map((app: any, idx: number) => (
+                            <li key={idx} className="text-sm">
+                              • {app.jobTitle} at {app.company}
+                              <span className="text-xs text-muted-foreground ml-2">
+                                ({new Date(app.timestamp).toLocaleDateString()})
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Recent Activity */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h3 className="font-semibold mb-3">Recent Logins</h3>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {analytics.loginHistory.slice(0, 20).map((login: any, index: number) => (
+                      <div key={index} className="text-sm border-b pb-2">
+                        <div className="font-medium">{login.email}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(login.timestamp).toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-3">Recent Applications</h3>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {analytics.applicationHistory.slice(0, 20).map((app: any, index: number) => (
+                      <div key={index} className="text-sm border-b pb-2">
+                        <div className="font-medium">{app.email}</div>
+                        <div className="text-muted-foreground">{app.jobTitle} at {app.company}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(app.timestamp).toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <Button onClick={loadAnalytics} variant="outline" className="w-full">
+                Refresh Analytics
+              </Button>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">No analytics data available</div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card id="add-job-manually">
         <CardHeader>
           <CardTitle>{editingJob ? 'Edit Job' : 'Add Job Manually'}</CardTitle>
@@ -288,6 +433,15 @@ const Admin = () => {
               <Label>Description *</Label>
               <Textarea rows={5} value={manual.description} onChange={(e) => setManual(s => ({ ...s, description: e.target.value }))} />
             </div>
+          <div className="md:col-span-4 space-y-2">
+            <Label>Application Link</Label>
+            <Input
+              placeholder="Paste external apply link or Google Form URL"
+              value={manual.applyUrl}
+              onChange={(e) => setManual(s => ({ ...s, applyUrl: e.target.value }))}
+            />
+            <p className="text-xs text-muted-foreground">If provided, clicking Apply will open this link.</p>
+          </div>
             <div className="md:col-span-4 space-y-2">
               <Label>Requirements</Label>
               <Textarea 

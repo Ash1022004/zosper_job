@@ -1,0 +1,43 @@
+{
+  "logins": [
+    {
+      "userId": 2,
+      "email": "ashishchaudhary29133@gmail.com",
+      "timestamp": "2025-11-04T20:17:52.336Z"
+    },
+    {
+      "userId": 2,
+      "email": "ashishchaudhary29133@gmail.com",
+      "timestamp": "2025-11-05T10:50:29.108Z"
+    },
+    {
+      "userId": 2,
+      "email": "ashishchaudhary29133@gmail.com",
+      "timestamp": "2025-11-05T10:50:55.689Z"
+    },
+    {
+      "userId": 2,
+      "email": "ashishchaudhary29133@gmail.com",
+      "timestamp": "2025-11-05T10:58:48.801Z"
+    }
+  ],
+  "applications": [
+    {
+      "userId": 2,
+      "email": "ashishchaudhary29133@gmail.com",
+      "jobId": "2",
+      "jobTitle": "UI/UX Designer",
+      "company": "DesignHub Inc.",
+      "timestamp": "2025-11-05T10:58:57.555Z"
+    },
+    {
+      "userId": 2,
+      "email": "ashishchaudhary29133@gmail.com",
+      "jobId": "1",
+      "jobTitle": "Senior Frontend Developer",
+      "company": "TechCorp Solutions",
+      "timestamp": "2025-11-05T11:02:05.270Z"
+    }
+  ],
+  "pageViews": []
+}
