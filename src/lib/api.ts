@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'https://zosper-job-1.onrender.com/';
+const API_URL = (import.meta.env.VITE_API_URL || 'https://zosper-job-1.onrender.com').replace(/\/$/, '');
 
 export async function apiRegister(email: string, password: string) {
   const res = await fetch(`${API_URL}/api/auth/register`, {
@@ -32,8 +32,6 @@ export async function apiMe() {
   return res.json();
 }
 
-const API_BASE = '/api';
-
 export interface ApiUser {
   id: number;
   email: string;
@@ -49,8 +47,9 @@ export interface AuthResponse {
 
 async function api<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const token = localStorage.getItem('token');
-  const res = await fetch(`${API_BASE}${endpoint}`, {
+  const res = await fetch(`${API_URL}/api${endpoint}`, {
     ...options,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

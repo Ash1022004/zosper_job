@@ -7,6 +7,7 @@ const { getUserByEmail, createUser, ensureAdmin, trackLogin, trackApplication, g
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
 const ORIGIN = process.env.ORIGIN || 'http://localhost:8080';
+const IS_PRODUCTION = process.env.NODE_ENV === 'production' || ORIGIN.startsWith('https://');
 
 const app = express();
 app.use(cors({ 
@@ -55,7 +56,12 @@ app.post('/api/auth/register', async (req, res) => {
   const hash = await bcrypt.hash(password, 10);
   const user = createUser({ email, password_hash: hash, role: 'user', name, mobile: mobileTrim });
   const token = signSession(user);
-  res.cookie('session', token, { httpOnly: true, sameSite: 'lax' });
+  res.cookie('session', token, { 
+    httpOnly: true, 
+    sameSite: IS_PRODUCTION ? 'none' : 'lax',
+    secure: IS_PRODUCTION,
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+  });
   return res.json({ token, user: { id: user.id, email: user.email, name: user.name || undefined, mobile: user.mobile || undefined, isAdmin: false } });
 });
 
@@ -76,7 +82,12 @@ app.post('/api/auth/login', async (req, res) => {
   console.log(`[LOGIN] Success for email: ${emailTrimmed}, role: ${row.role}`);
   const user = { id: row.id, email: row.email, role: row.role, name: row.name, mobile: row.mobile };
   const token = signSession(user);
-  res.cookie('session', token, { httpOnly: true, sameSite: 'lax' });
+  res.cookie('session', token, { 
+    httpOnly: true, 
+    sameSite: IS_PRODUCTION ? 'none' : 'lax',
+    secure: IS_PRODUCTION,
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+  });
   // Track login for analytics
   if (row.role === 'user') {
     trackLogin(row.id, row.email);
@@ -85,7 +96,11 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 app.post('/api/auth/logout', (req, res) => {
-  res.clearCookie('session');
+  res.clearCookie('session', { 
+    httpOnly: true, 
+    sameSite: IS_PRODUCTION ? 'none' : 'lax',
+    secure: IS_PRODUCTION
+  });
   res.json({ ok: true });
 });
 
