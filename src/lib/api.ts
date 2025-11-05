@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const API_URL = import.meta.env.VITE_API_URL || 'https://zosper-job-1.onrender.com/';
 
 export async function apiRegister(email: string, password: string) {
   const res = await fetch(`${API_URL}/api/auth/register`, {
