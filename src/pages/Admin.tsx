@@ -212,8 +212,15 @@ const Admin = () => {
             variant="outline" 
             size="sm"
             onClick={async () => {
-              await apiLogout();
-              navigate('/', { replace: true });
+              try {
+                await apiLogout();
+                localStorage.removeItem('admin_token'); // Clear token from localStorage
+              } catch (error) {
+                console.error('Logout error:', error);
+              } finally {
+                // Force page reload to clear all state
+                window.location.href = '/';
+              }
             }}
           >
             <Home className="w-4 h-4 mr-2" />
