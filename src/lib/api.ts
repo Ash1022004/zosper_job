@@ -141,7 +141,8 @@ export const feedbackApi = {
 
 export const analyticsApi = {
   trackApplication: async (jobId: string, jobTitle: string, company: string) => {
-    const token = localStorage.getItem('admin_token');
+    // Check for both admin_token and regular user token
+    const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
     const headers: HeadersInit = { 'Content-Type': 'application/json' };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
@@ -152,7 +153,11 @@ export const analyticsApi = {
       credentials: 'include',
       body: JSON.stringify({ jobId, jobTitle, company }),
     });
-    if (!res.ok) throw new Error('Failed to track application');
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ error: res.statusText }));
+      console.error('[Analytics] Track application failed:', errorData);
+      throw new Error(errorData.error || 'Failed to track application');
+    }
     return res.json();
   },
   getSummary: async () => {

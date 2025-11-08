@@ -269,8 +269,15 @@ const Admin = () => {
       {/* Analytics Section */}
       <Card>
         <CardHeader>
-          <CardTitle>User Analytics</CardTitle>
-          <CardDescription>View user activity, logins, and job applications</CardDescription>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>User Analytics</CardTitle>
+              <CardDescription>View user activity, logins, and job applications</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={loadAnalytics} disabled={loadingAnalytics}>
+              {loadingAnalytics ? 'Refreshing...' : 'Refresh'}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {loadingAnalytics ? (
