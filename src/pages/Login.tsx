@@ -40,16 +40,48 @@ const Login = () => {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    
+    if (!email.trim() || !password) {
+      toast({ title: 'Please enter email and password', variant: 'destructive' });
+      return;
+    }
+    
     try {
+      console.log('[Login] Attempting login...');
       const response = await apiLogin(email.trim(), password);
-      if (response.user?.isAdmin) {
-        toast({ title: 'Welcome' });
-        navigate('/admin', { replace: true });
+      console.log('[Login] Response:', response);
+      
+      // Check both isAdmin and role for compatibility
+      const isAdmin = response.user?.isAdmin === true || response.user?.role === 'admin';
+      
+      if (isAdmin) {
+        console.log('[Login] Admin login successful');
+        console.log('[Login] Response token:', response.token);
+        // Store token in localStorage as backup
+        if (response.token) {
+          localStorage.setItem('admin_token', response.token);
+        }
+        toast({ title: 'Welcome, Admin!' });
+        // Use window.location for full page reload to ensure cookie is sent
+        // Wait a bit longer to ensure cookie is set
+        setTimeout(() => {
+          console.log('[Login] Navigating to /admin...');
+          window.location.href = '/admin';
+        }, 500);
       } else {
+        console.log('[Login] Not an admin user');
         toast({ title: 'Access denied. Admin privileges required.', variant: 'destructive' });
       }
-    } catch (e) {
-      toast({ title: 'Invalid credentials', variant: 'destructive' });
+    } catch (e: any) {
+      console.error('[Login] Login error:', e);
+      const errorMessage = e?.message || 'Invalid credentials';
+      toast({ 
+        title: errorMessage.includes('CORS') || errorMessage.includes('fetch') 
+          ? 'Connection error. Please check your network.' 
+          : 'Invalid credentials', 
+        variant: 'destructive' 
+      });
     }
   };
 
@@ -69,14 +101,27 @@ const Login = () => {
           <CardDescription>Sign in to manage job postings</CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4" onSubmit={onSubmit}>
+          <form className="space-y-4" onSubmit={onSubmit} autoComplete="off">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Input 
+                id="email" 
+                type="email" 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="off"
+                autoFocus
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <Input 
+                id="password" 
+                type="password" 
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="off"
+              />
             </div>
             <Button className="w-full" type="submit">Sign in</Button>
           </form>

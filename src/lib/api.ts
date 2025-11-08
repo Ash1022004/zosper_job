@@ -12,14 +12,25 @@ export async function apiRegister(email: string, password: string) {
 }
 
 export async function apiLogin(email: string, password: string) {
-  const res = await fetch(`${API_URL}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ email, password })
-  });
-  if (!res.ok) throw new Error('login failed');
-  return res.json();
+  try {
+    const res = await fetch(`${API_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email, password })
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(errorData.error || 'Login failed');
+    }
+    return res.json();
+  } catch (error: any) {
+    // Handle network errors
+    if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
+      throw new Error('Network error: Could not connect to server');
+    }
+    throw error;
+  }
 }
 
 export async function apiLogout() {
@@ -27,9 +38,18 @@ export async function apiLogout() {
 }
 
 export async function apiMe() {
-  const res = await fetch(`${API_URL}/api/auth/me`, { credentials: 'include' });
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const res = await fetch(`${API_URL}/api/auth/me`, { credentials: 'include' });
+    if (!res.ok) {
+      console.log('[API] apiMe failed:', res.status, res.statusText);
+      return null;
+    }
+    return res.json();
+  } catch (error: any) {
+    console.log('[API] apiMe error:', error);
+    // Network errors are expected when not authenticated
+    return null;
+  }
 }
 
 export interface ApiUser {

@@ -20,12 +20,42 @@ const RequireAdmin = ({ children }: { children: React.ReactNode }) => {
   const [state, setState] = useState<{ loading: boolean; ok: boolean }>(() => ({ loading: true, ok: false }));
   useEffect(() => {
     (async () => {
-      const me = await apiMe();
-      const ok = !!me?.user && me.user.role === 'admin';
-      setState({ loading: false, ok });
+      try {
+        // Add longer delay to ensure cookie is available after page reload
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        console.log('[RequireAdmin] Checking authentication...');
+        console.log('[RequireAdmin] Cookies:', document.cookie);
+        console.log('[RequireAdmin] Admin token in localStorage:', localStorage.getItem('admin_token'));
+        
+        const me = await apiMe();
+        console.log('[RequireAdmin] apiMe response:', me);
+        console.log('[RequireAdmin] User object:', me?.user);
+        console.log('[RequireAdmin] User role:', me?.user?.role);
+        console.log('[RequireAdmin] User isAdmin:', me?.user?.isAdmin);
+        
+        // Check both role and isAdmin for compatibility
+        const ok = !!me?.user && (me.user.role === 'admin' || me.user.isAdmin === true);
+        console.log('[RequireAdmin] Is admin?', ok);
+        
+        if (!ok && me?.user) {
+          console.warn('[RequireAdmin] User exists but is not admin:', me.user);
+        }
+        
+        setState({ loading: false, ok });
+      } catch (error) {
+        console.error('[RequireAdmin] Auth check failed:', error);
+        setState({ loading: false, ok: false });
+      }
     })();
   }, []);
-  if (state.loading) return null;
+  if (state.loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
   return state.ok ? <>{children}</> : <Navigate to="/login" replace />;
 };
 
