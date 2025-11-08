@@ -13,10 +13,18 @@ const Header = () => {
     (async () => {
       try {
         const me = await apiMe();
-        setAdmin(me?.user || null);
+        // Only set admin if user is actually an admin
+        if (me?.user && (me.user.role === 'admin' || me.user.isAdmin === true)) {
+          setAdmin(me.user);
+        } else {
+          setAdmin(null);
+          // Clear stale token if not authenticated
+          localStorage.removeItem('admin_token');
+        }
       } catch {
         // Not authenticated or request failed
         setAdmin(null);
+        localStorage.removeItem('admin_token');
       }
     })();
   }, [location.pathname]);
@@ -32,9 +40,11 @@ const Header = () => {
               e.preventDefault();
               try {
                 await apiLogout();
+                localStorage.removeItem('admin_token'); // Clear token from localStorage
               } finally {
                 setAdmin(null);
                 navigate('/', { replace: true });
+                window.location.reload(); // Force refresh
               }
             }
           }}
@@ -51,9 +61,11 @@ const Header = () => {
                 e.preventDefault();
                 try {
                   await apiLogout();
+                  localStorage.removeItem('admin_token'); // Clear token from localStorage
                 } finally {
                   setAdmin(null);
                   navigate('/', { replace: true });
+                  window.location.reload(); // Force refresh
                 }
               }
             }}
@@ -61,7 +73,14 @@ const Header = () => {
             Home
           </Link>
           {admin?.role === 'admin' ? (
-            <Button size="sm" onClick={async () => { await apiLogout(); setAdmin(null); navigate('/', { replace: true }); }}>Admin logout</Button>
+            <Button size="sm" onClick={async () => { 
+              await apiLogout(); 
+              localStorage.removeItem('admin_token'); // Clear token from localStorage
+              setAdmin(null); 
+              navigate('/', { replace: true });
+              // Force refresh to clear any cached state
+              window.location.reload();
+            }}>Admin logout</Button>
           ) : user ? (
             <div className="flex items-center gap-3">
               <span className="text-muted-foreground text-xs">Hi, {user.name || user.email.split('@')[0]}</span>

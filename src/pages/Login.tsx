@@ -19,11 +19,17 @@ const Login = () => {
     (async () => {
       try {
         const me = await apiMe();
-        if (me?.user && me.user.role === 'admin') {
+        // Only auto-redirect if we have a valid admin session
+        if (me?.user && (me.user.role === 'admin' || me.user.isAdmin === true)) {
+          console.log('[Login] Already logged in as admin, redirecting...');
           navigate('/admin', { replace: true });
+        } else {
+          // Clear any stale tokens if not authenticated
+          localStorage.removeItem('admin_token');
         }
       } catch (error) {
-        // User is not authenticated, show login form
+        // User is not authenticated, clear any stale tokens
+        localStorage.removeItem('admin_token');
       } finally {
         setChecking(false);
       }

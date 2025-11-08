@@ -141,9 +141,14 @@ export const feedbackApi = {
 
 export const analyticsApi = {
   trackApplication: async (jobId: string, jobTitle: string, company: string) => {
+    const token = localStorage.getItem('admin_token');
+    const headers: HeadersInit = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
     const res = await fetch(`${API_URL}/api/analytics/application`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       credentials: 'include',
       body: JSON.stringify({ jobId, jobTitle, company }),
     });
@@ -151,10 +156,19 @@ export const analyticsApi = {
     return res.json();
   },
   getSummary: async () => {
+    const token = localStorage.getItem('admin_token');
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
     const res = await fetch(`${API_URL}/api/analytics/summary`, {
       credentials: 'include',
+      headers,
     });
-    if (!res.ok) throw new Error('Failed to get analytics');
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(errorData.error || 'Failed to get analytics');
+    }
     return res.json();
   },
 };
