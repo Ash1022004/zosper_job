@@ -79,10 +79,21 @@ function signSession(user) {
 }
 
 function authMiddleware(req, res, next) {
-  const token = req.cookies['session'];
+  // Try to get token from cookie first
+  let token = req.cookies['session'];
+  
+  // Fallback: try to get token from Authorization header
+  if (!token) {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+      console.log('[AUTH] Token found in Authorization header');
+    }
+  }
+  
   console.log('[AUTH] Checking auth - cookies:', Object.keys(req.cookies), 'token present:', !!token);
   if (!token) {
-    console.log('[AUTH] No token found');
+    console.log('[AUTH] No token found in cookie or header');
     return res.status(401).json({ error: 'unauthorized' });
   }
   try {
@@ -101,8 +112,13 @@ function setAuthCookie(res, token) {
     sameSite: IS_PRODUCTION ? 'none' : 'lax',
     secure: IS_PRODUCTION,
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    path: '/' // Important: set path to root so cookie is available on all routes
+    path: '/', // Important: set path to root so cookie is available on all routes
+    // DO NOT set domain - this allows cross-domain cookies to work
   };
+  
+  // For cross-domain cookies, explicitly set Access-Control-Allow-Credentials
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
   res.cookie('session', token, cookieOptions);
   console.log('[AUTH] Cookie set with options:', { 
     sameSite: cookieOptions.sameSite, 
@@ -110,9 +126,11 @@ function setAuthCookie(res, token) {
     path: cookieOptions.path,
     httpOnly: cookieOptions.httpOnly,
     maxAge: '7 days',
-    isProduction: IS_PRODUCTION
+    isProduction: IS_PRODUCTION,
+    domain: 'NOT SET (allows cross-domain)'
   });
   console.log('[AUTH] Request origin:', res.req?.headers?.origin);
+  console.log('[AUTH] Response headers - Set-Cookie:', res.getHeader('Set-Cookie'));
 }
 
 app.post('/api/auth/register', async (req, res) => {

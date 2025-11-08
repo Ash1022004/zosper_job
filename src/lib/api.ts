@@ -39,7 +39,19 @@ export async function apiLogout() {
 
 export async function apiMe() {
   try {
-    const res = await fetch(`${API_URL}/api/auth/me`, { credentials: 'include' });
+    // Try to get token from localStorage as fallback
+    const token = localStorage.getItem('admin_token');
+    
+    const headers: HeadersInit = {};
+    // If we have a token in localStorage, send it as Authorization header
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    const res = await fetch(`${API_URL}/api/auth/me`, { 
+      credentials: 'include',
+      headers
+    });
     if (!res.ok) {
       console.log('[API] apiMe failed:', res.status, res.statusText);
       return null;
