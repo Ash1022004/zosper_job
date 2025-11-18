@@ -3,11 +3,35 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const nodemailer = require('nodemailer');
 const { getUserByEmail, createUser, ensureAdmin, trackLogin, trackApplication, getAnalyticsSummary, createOtpForEmail, verifyOtpForEmail } = require('./store.cjs');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
 const ORIGIN = process.env.ORIGIN || 'http://localhost:8080';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production' || ORIGIN.startsWith('https://');
+
+// OTP email transport (configure via env vars)
+const SMTP_HOST = process.env.SMTP_HOST;
+const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
+const SMTP_USER = process.env.SMTP_USER;
+const SMTP_PASS = process.env.SMTP_PASS;
+const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER;
+
+let otpTransport = null;
+if (SMTP_HOST && SMTP_USER && SMTP_PASS && SMTP_FROM) {
+  otpTransport = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_PORT === 465,
+    auth: {
+      user: SMTP_USER,
+      pass: SMTP_PASS,
+    },
+  });
+  console.log('[OTP] Email transport configured for', SMTP_HOST);
+} else {
+  console.warn('[OTP] SMTP not fully configured; OTP emails will not be sent. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM.');
+}
 
 // Support multiple origins (comma-separated)
 const ALLOWED_ORIGINS = ORIGIN.split(',').map(o => o.trim()).filter(Boolean);
@@ -146,15 +170,35 @@ app.post('/api/auth/send-otp', (req, res) => {
   }
   const { code, expiresAt } = createOtpForEmail(normalizedEmail);
   console.log(`[OTP] Generated ${code} for ${normalizedEmail}, expires at ${new Date(expiresAt).toISOString()}`);
-  const payload = {
-    success: true,
-    expiresAt,
-    expiresInMs: Math.max(0, expiresAt - Date.now()),
-  };
-  if (!IS_PRODUCTION) {
-    payload.previewCode = code;
+
+  if (!otpTransport) {
+    console.warn('[OTP] Attempted to send OTP but SMTP is not configured');
+    return res.status(500).json({ error: 'otp email service not configured' });
   }
-  return res.json(payload);
+
+  const mailOptions = {
+    from: SMTP_FROM,
+    to: normalizedEmail,
+    subject: 'Your Zosper verification code',
+    text: `Your verification code is ${code}. It is valid for 5 minutes.\n\nIf you did not request this code, you can ignore this email.`,
+  };
+
+  otpTransport.sendMail(mailOptions, (err) => {
+    if (err) {
+      console.error('[OTP] Failed to send email:', err);
+      return res.status(500).json({ error: 'failed to send otp email' });
+    }
+
+    const payload = {
+      success: true,
+      expiresAt,
+      expiresInMs: Math.max(0, expiresAt - Date.now()),
+    };
+    if (!IS_PRODUCTION) {
+      payload.previewCode = code;
+    }
+    return res.json(payload);
+  });
 });
 
 app.post('/api/auth/register', async (req, res) => {
