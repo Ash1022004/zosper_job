@@ -5,6 +5,13 @@ const bcrypt = require('bcryptjs');
 const DATA_DIR = path.join(process.cwd(), 'server');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const ANALYTICS_FILE = path.join(DATA_DIR, 'analytics.json');
+const OTP_TTL_MS = 5 * 60 * 1000;
+
+const pendingOtps = new Map();
+
+function normalizeEmail(email = '') {
+  return String(email).toLowerCase().trim();
+}
 
 function readJson(file, fallback) {
   try {
@@ -29,8 +36,8 @@ function saveAllUsers(users) {
 }
 
 function getUserByEmail(email) {
-  const emailLower = email.toLowerCase().trim();
-  return getAllUsers().find(u => u.email.toLowerCase().trim() === emailLower) || null;
+  const emailLower = normalizeEmail(email);
+  return getAllUsers().find(u => normalizeEmail(u.email) === emailLower) || null;
 }
 
 function createUser({ email, password_hash, role, name, mobile }) {
@@ -49,8 +56,8 @@ function ensureAdmin(email, password) {
     // User exists but not admin, update to admin
     const users = getAllUsers();
     // FIX: Normalize email case for comparison to match getUserByEmail behavior
-    const emailNormalized = email.toLowerCase().trim();
-    const user = users.find(us => us.email.toLowerCase().trim() === emailNormalized);
+    const emailNormalized = normalizeEmail(email);
+    const user = users.find(us => normalizeEmail(us.email) === emailNormalized);
     if (user) {
       const hash = bcrypt.hashSync(password, 10);
       user.password_hash = hash;
@@ -109,6 +116,38 @@ function trackPageView(userId, email, page) {
     timestamp: new Date().toISOString()
   });
   saveAnalytics(analytics);
+}
+
+function createOtpForEmail(rawEmail) {
+  const email = normalizeEmail(rawEmail);
+  if (!email) {
+    throw new Error('Invalid email for OTP generation');
+  }
+  const code = (Math.floor(100000 + Math.random() * 900000)).toString();
+  const expiresAt = Date.now() + OTP_TTL_MS;
+  pendingOtps.set(email, { code, expiresAt, attempts: 0 });
+  return { code, expiresAt };
+}
+
+function verifyOtpForEmail(rawEmail, submittedCode) {
+  const email = normalizeEmail(rawEmail);
+  const code = String(submittedCode || '').trim();
+  if (!email || code.length === 0) return false;
+  const record = pendingOtps.get(email);
+  if (!record) return false;
+  if (Date.now() > record.expiresAt) {
+    pendingOtps.delete(email);
+    return false;
+  }
+  if (record.code !== code) {
+    record.attempts = (record.attempts || 0) + 1;
+    if (record.attempts >= 5) {
+      pendingOtps.delete(email);
+    }
+    return false;
+  }
+  pendingOtps.delete(email);
+  return true;
 }
 
 function getAnalyticsSummary() {
@@ -186,6 +225,8 @@ module.exports = {
   trackLogin,
   trackApplication,
   trackPageView,
-  getAnalyticsSummary
+  getAnalyticsSummary,
+  createOtpForEmail,
+  verifyOtpForEmail,
 };
 

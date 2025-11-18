@@ -7,7 +7,7 @@ import { JobFilters } from '@/components/JobFilters';
 import { JobDetailModal } from '@/components/JobDetailModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Briefcase } from 'lucide-react';
+import { Search, Briefcase, MessageCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import heroImage from '@/assets/hero-jobs.jpg';
 
@@ -21,6 +21,7 @@ const Index = () => {
     searchQuery: ''
   });
   const [heroSearch, setHeroSearch] = useState('');
+  const whatsappInviteUrl = 'https://chat.whatsapp.com/KCVIy6e6yPG24EaF5BjHPx?mode=wwt';
 
   const handleHeroSearch = () => {
     setFilters(prev => ({ ...prev, searchQuery: heroSearch }));
@@ -46,6 +47,7 @@ const Index = () => {
   const [refreshVersion, setRefreshVersion] = useState(0);
 
   const filteredJobs = useMemo(() => {
+    void refreshVersion;
     const list = loadJobs();
     return list.filter(job => {
       const matchesLocation = !filters.location || job.location.includes(filters.location);
@@ -142,6 +144,17 @@ const Index = () => {
               <span>Updated Daily</span>
               <span>•</span>
               <span>Direct Apply</span>
+            </div>
+            <div className="flex justify-center mt-6">
+              <a
+                href={whatsappInviteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full bg-secondary/10 text-secondary border border-secondary/40 hover:bg-secondary/20 transition-colors"
+              >
+                <MessageCircle className="w-4 h-4" />
+                Join the Zosper WhatsApp Community
+              </a>
             </div>
           </div>
         </div>

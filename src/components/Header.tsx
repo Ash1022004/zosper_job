@@ -2,12 +2,14 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { getUser, userLogout } from '@/store/userStore';
 import { useEffect, useState } from 'react';
-import { apiLogout, apiMe } from '@/lib/api';
+import { apiLogout, apiMe, type ApiUser } from '@/lib/api';
+
+type AdminUser = ApiUser & { role?: string };
 
 const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [admin, setAdmin] = useState<any>(null);
+  const [admin, setAdmin] = useState<AdminUser | null>(null);
   const user = getUser();
   useEffect(() => {
     (async () => {
@@ -49,8 +51,8 @@ const Header = () => {
             }
           }}
         >
-          {/* <img src="/JOB_VAULTlogo.png" alt="Job Vault" className="h-6 w-6" /> */}
-          <span>Job vault</span>
+          {/* <img src="/JOB_VAULTlogo.png" alt="Zosper" className="h-6 w-6" /> */}
+          <span>Zosper</span>
         </Link>
         <nav className="flex items-center gap-4 text-sm">
           <Link

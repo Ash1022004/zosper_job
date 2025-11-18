@@ -24,7 +24,7 @@ const PrivacyPolicy = () => {
             </div>
 
             <p className="text-muted-foreground">
-              This Privacy Policy describes how Career Folks Private Limited ("Job Vault") collects, 
+              This Privacy Policy describes how Career Folks Private Limited ("Zosper") collects, 
               processes, and protects personal information of its users in compliance with the Information 
               Technology Act, 2000 and applicable data protection standards.
             </p>
@@ -145,7 +145,7 @@ const PrivacyPolicy = () => {
                   For privacy or legal concerns, please contact:
                 </p>
                 <div className="bg-muted/50 p-4 rounded-lg space-y-2 text-muted-foreground">
-                  <p className="font-medium">Career Folks Private Limited (Job Vault)</p>
+                  <p className="font-medium">Career Folks Private Limited (Zosper)</p>
                   <p>Lower Parel, Mumbai, Maharashtra, India</p>
                   <p>
                     <a href="mailto:jobvault25@gmail.com" className="text-primary hover:underline">

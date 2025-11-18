@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,8 +11,47 @@ import { getCurrentUser } from '@/store/authStore';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { refreshFromCsvSource } from '@/lib/sources';
 import { useNavigate } from 'react-router-dom';
-import { Home } from 'lucide-react';
+import { Download, Home } from 'lucide-react';
 import { apiLogout, analyticsApi } from '@/lib/api';
+
+type AnalyticsJobStat = {
+  jobId: string;
+  jobTitle: string;
+  company: string;
+  count: number;
+  users: Array<string | number>;
+};
+
+type AnalyticsUserHistory = {
+  userId: string | number;
+  email: string;
+  applications: {
+    jobId: string;
+    jobTitle: string;
+    company: string;
+    timestamp: string;
+  }[];
+};
+
+type AnalyticsHistoryEntry = {
+  email: string;
+  jobTitle?: string;
+  company?: string;
+  timestamp: string;
+};
+
+type AnalyticsSummary = {
+  totalUsers: number;
+  uniqueLoggedInUsers: number;
+  totalLogins: number;
+  recentLogins: number;
+  totalApplications: number;
+  recentApplications: number;
+  applicationsByJob: AnalyticsJobStat[];
+  userApplications: AnalyticsUserHistory[];
+  loginHistory: AnalyticsHistoryEntry[];
+  applicationHistory: Required<AnalyticsHistoryEntry>[];
+};
 
 function parseCsv(text: string): Job[] {
   // Minimal CSV parser for simple admin use: expects header names matching Job keys
@@ -60,8 +99,11 @@ const Admin = () => {
   const [csvFileName, setCsvFileName] = useState('');
   const [settings, setSettings] = useState<JobsSettings>(() => getSettings());
   const [jobsVersion, setJobsVersion] = useState(0);
-  const existingJobs = useMemo(() => loadJobs(), [jobsVersion]);
-  const [analytics, setAnalytics] = useState<any>(null);
+  const existingJobs = useMemo(() => {
+    void jobsVersion;
+    return loadJobs();
+  }, [jobsVersion]);
+  const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
   const [manual, setManual] = useState({
@@ -80,15 +122,45 @@ const Admin = () => {
   });
 
   const [editingJob, setEditingJob] = useState<Job | null>(null);
+  const csvTemplate = [
+    'id,title,company,location,experience,salary,datePosted,jobType,description,requirements,responsibilities,benefits,applyUrl,contactEmail,contactWhatsApp,companyLogo',
+    '1,Senior Frontend Developer,TechCorp Solutions,Bangalore,3-5 years,₹15-25 LPA,2025-10-26,Full-time,"Lead frontend initiatives for enterprise apps","React|TypeScript|Tailwind","Build UI|Review code","Health Insurance|Remote Option",https://apply.example.com,hr@techcorp.com,+91-9876543210,https://logo.clearbit.com/techcorp.com'
+  ].join('\n');
+  const csvColumns = [
+    { name: 'id', description: 'Unique identifier (auto-generated if blank)' },
+    { name: 'title*', description: 'Job title' },
+    { name: 'company*', description: 'Company name' },
+    { name: 'location*', description: 'City / Remote' },
+    { name: 'experience*', description: 'e.g., 3-5 years' },
+    { name: 'salary', description: 'Include ₹ or LPA text' },
+    { name: 'datePosted*', description: 'YYYY-MM-DD' },
+    { name: 'jobType*', description: 'Full-time / Internship / Contract / Part-time' },
+    { name: 'description*', description: 'Full job description' },
+    { name: 'requirements', description: 'Use | to separate multiple entries' },
+    { name: 'responsibilities', description: 'Use | separator' },
+    { name: 'benefits', description: 'Use | separator' },
+    { name: 'applyUrl', description: 'Optional external application link' },
+    { name: 'contactEmail', description: 'Recruiter email' },
+    { name: 'contactWhatsApp', description: 'Digits only or +91 format' },
+    { name: 'companyLogo', description: 'Direct image URL' }
+  ];
 
-  useEffect(() => {
-    loadAnalytics();
-  }, []);
+  const downloadCsvTemplate = () => {
+    const blob = new Blob([csvTemplate], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'zosper-jobs-template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
-  const loadAnalytics = async () => {
+  const loadAnalytics = useCallback(async () => {
     setLoadingAnalytics(true);
     try {
-      const data = await analyticsApi.getSummary();
+      const data: AnalyticsSummary = await analyticsApi.getSummary();
       setAnalytics(data);
     } catch (error) {
       console.error('Failed to load analytics:', error);
@@ -96,7 +168,11 @@ const Admin = () => {
     } finally {
       setLoadingAnalytics(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    loadAnalytics();
+  }, [loadAnalytics]);
 
   const handleCsvImport = () => {
     const parsed = parseCsv(csvText);
@@ -240,6 +316,37 @@ const Admin = () => {
             <li>Description, Job Type (Full-time/Internship/Contract)</li>
             <li>Email (optional), WhatsApp (optional)</li>
           </ul>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={downloadCsvTemplate}>
+              <Download className="w-4 h-4 mr-2" />
+              Download sample CSV
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                navigator.clipboard.writeText(csvTemplate);
+                toast({ title: 'CSV header copied to clipboard' });
+              }}
+            >
+              Copy header row
+            </Button>
+          </div>
+          <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
+            <p className="text-sm font-semibold text-foreground">Column reference</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-muted-foreground">
+              {csvColumns.map((column) => (
+                <div key={column.name} className="border rounded-md p-2 bg-background">
+                  <p className="font-medium text-foreground">{column.name}</p>
+                  <p>{column.description}</p>
+                </div>
+              ))}
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">Sample rows</p>
+              <pre className="mt-1 text-xs bg-background border rounded-md p-2 overflow-x-auto whitespace-pre-wrap">{csvTemplate}</pre>
+            </div>
+          </div>
           <div className="space-y-2">
             <Input type="file" accept=".csv" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleCsvFile(f); }} />
             {csvFileName ? <div className="text-xs text-muted-foreground">Loaded: {csvFileName}</div> : null}
@@ -318,7 +425,7 @@ const Admin = () => {
                 <div>
                   <h3 className="font-semibold mb-3">Most Applied Jobs</h3>
                   <div className="space-y-2">
-                    {analytics.applicationsByJob.slice(0, 10).map((job: any, index: number) => (
+                    {analytics.applicationsByJob.slice(0, 10).map((job, index) => (
                       <div key={job.jobId} className="border rounded-lg p-3 flex justify-between items-center">
                         <div>
                           <div className="font-medium">{job.jobTitle}</div>
@@ -339,14 +446,14 @@ const Admin = () => {
                 <div>
                   <h3 className="font-semibold mb-3">User Application History</h3>
                   <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {analytics.userApplications.map((userApp: any) => (
+                    {analytics.userApplications.map((userApp) => (
                       <div key={userApp.userId} className="border rounded-lg p-3">
                         <div className="font-medium mb-2">{userApp.email}</div>
                         <div className="text-sm text-muted-foreground">
                           Applied to {userApp.applications.length} job(s):
                         </div>
                         <ul className="mt-2 space-y-1">
-                          {userApp.applications.map((app: any, idx: number) => (
+                          {userApp.applications.map((app, idx) => (
                             <li key={idx} className="text-sm">
                               • {app.jobTitle} at {app.company}
                               <span className="text-xs text-muted-foreground ml-2">
@@ -366,7 +473,7 @@ const Admin = () => {
                 <div>
                   <h3 className="font-semibold mb-3">Recent Logins</h3>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {analytics.loginHistory.slice(0, 20).map((login: any, index: number) => (
+                    {analytics.loginHistory.slice(0, 20).map((login, index) => (
                       <div key={index} className="text-sm border-b pb-2">
                         <div className="font-medium">{login.email}</div>
                         <div className="text-xs text-muted-foreground">
@@ -379,7 +486,7 @@ const Admin = () => {
                 <div>
                   <h3 className="font-semibold mb-3">Recent Applications</h3>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {analytics.applicationHistory.slice(0, 20).map((app: any, index: number) => (
+                    {analytics.applicationHistory.slice(0, 20).map((app, index) => (
                       <div key={index} className="text-sm border-b pb-2">
                         <div className="font-medium">{app.email}</div>
                         <div className="text-muted-foreground">{app.jobTitle} at {app.company}</div>

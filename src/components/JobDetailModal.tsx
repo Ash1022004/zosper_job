@@ -9,7 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { MapPin, Briefcase, Calendar, DollarSign, Mail, Share2, MessageCircle, Lock } from 'lucide-react';
+import { MapPin, Briefcase, Calendar, IndianRupee, Mail, Share2, MessageCircle, Lock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { getUser } from '@/store/userStore';
@@ -23,9 +23,15 @@ interface JobDetailModalProps {
 }
 
 export const JobDetailModal = ({ job, open, onOpenChange }: JobDetailModalProps) => {
+  const navigate = useNavigate();
   if (!job) return null;
   const user = getUser();
-  const navigate = useNavigate();
+  const salaryLabel = job.salary?.trim();
+  const salaryDisplay = salaryLabel
+    ? /₹|rs|inr/i.test(salaryLabel)
+      ? salaryLabel
+      : `₹${salaryLabel}`
+    : '';
 
   const handleApply = async () => {
     if (!user) {
@@ -87,10 +93,10 @@ export const JobDetailModal = ({ job, open, onOpenChange }: JobDetailModalProps)
               <Briefcase className="w-4 h-4 text-primary" />
               <span>{job.experience}</span>
             </div>
-            {job.salary && (
+            {salaryDisplay && (
               <div className="flex items-center gap-2 text-muted-foreground">
-                <DollarSign className="w-4 h-4 text-secondary" />
-                <span className="font-semibold text-secondary">{job.salary}</span>
+                <IndianRupee className="w-4 h-4 text-secondary" />
+                <span className="font-semibold text-secondary">{salaryDisplay}</span>
               </div>
             )}
             <div className="flex items-center gap-2 text-muted-foreground">

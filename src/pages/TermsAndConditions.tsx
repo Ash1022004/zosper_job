@@ -24,7 +24,7 @@ const TermsAndConditions = () => {
             </div>
 
             <p className="text-muted-foreground">
-              These Terms & Conditions ("Terms") govern your use of the Job Vault platform ("Platform"), 
+              These Terms & Conditions ("Terms") govern your use of the Zosper platform ("Platform"), 
               a service operated and owned by Career Folks Private Limited, having its registered office 
               at Lower Parel, Mumbai, Maharashtra, India ("Company", "we", "us", or "our").
             </p>
@@ -38,7 +38,7 @@ const TermsAndConditions = () => {
               <section>
                 <h2 className="text-2xl font-semibold mb-4">1. Nature of Services</h2>
                 <p className="text-muted-foreground mb-4">
-                  Job Vault acts as a digital intermediary platform connecting job seekers with employers 
+                  Zosper acts as a digital intermediary platform connecting job seekers with employers 
                   through curated and aggregated job postings.
                 </p>
                 <p className="text-muted-foreground mb-4">
@@ -82,7 +82,7 @@ const TermsAndConditions = () => {
                 <h2 className="text-2xl font-semibold mb-4">4. Job Postings and Third-Party Content</h2>
                 <ul className="list-disc list-inside space-y-2 text-muted-foreground ml-4">
                   <li>
-                    Job Vault aggregates and hosts listings submitted by employers, recruiters, or scraped 
+                    Zosper aggregates and hosts listings submitted by employers, recruiters, or scraped 
                     from publicly available websites.
                   </li>
                   <li>
@@ -90,7 +90,7 @@ const TermsAndConditions = () => {
                     postings unless verified.
                   </li>
                   <li>
-                    Job Vault shall not be responsible for:
+                    Zosper shall not be responsible for:
                     <ul className="list-circle list-inside ml-6 mt-2 space-y-1">
                       <li>Hiring outcomes or rejection decisions.</li>
                       <li>Fraudulent or misleading job listings posted by external employers.</li>
@@ -126,7 +126,7 @@ const TermsAndConditions = () => {
                     property of Career Folks Private Limited.
                   </li>
                   <li>
-                    Users retain ownership of their resumes and job postings but grant Job Vault a 
+                    Users retain ownership of their resumes and job postings but grant Zosper a 
                     non-exclusive, royalty-free license to display and process such data for operational purposes.
                   </li>
                   <li>
@@ -138,7 +138,7 @@ const TermsAndConditions = () => {
               <section>
                 <h2 className="text-2xl font-semibold mb-4">7. Data Accuracy & Disclaimer</h2>
                 <p className="text-muted-foreground mb-4">
-                  Job Vault is an information facilitation platform.
+                  Zosper is an information facilitation platform.
                 </p>
                 <p className="text-muted-foreground mb-4">
                   We make reasonable efforts to ensure accuracy but do not guarantee the completeness or 
@@ -186,7 +186,7 @@ const TermsAndConditions = () => {
               <section>
                 <h2 className="text-2xl font-semibold mb-4">10. Indemnity</h2>
                 <p className="text-muted-foreground">
-                  You agree to indemnify and hold harmless Career Folks Private Limited (Job Vault), 
+                  You agree to indemnify and hold harmless Career Folks Private Limited (Zosper), 
                   its directors, officers, and employees from all claims or damages arising out of your 
                   use of the Platform, including but not limited to violation of these Terms or misuse 
                   of third-party content.

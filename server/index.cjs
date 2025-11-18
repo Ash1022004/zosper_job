@@ -3,7 +3,7 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { getUserByEmail, createUser, ensureAdmin, trackLogin, trackApplication, getAnalyticsSummary } = require('./store.cjs');
+const { getUserByEmail, createUser, ensureAdmin, trackLogin, trackApplication, getAnalyticsSummary, createOtpForEmail, verifyOtpForEmail } = require('./store.cjs');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
 const ORIGIN = process.env.ORIGIN || 'http://localhost:8080';
@@ -133,17 +133,46 @@ function setAuthCookie(res, token) {
   console.log('[AUTH] Response headers - Set-Cookie:', res.getHeader('Set-Cookie'));
 }
 
+app.post('/api/auth/send-otp', (req, res) => {
+  const { email } = req.body || {};
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!normalizedEmail) return res.status(400).json({ error: 'email required' });
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailPattern.test(normalizedEmail)) {
+    return res.status(400).json({ error: 'invalid email address' });
+  }
+  if (getUserByEmail(normalizedEmail)) {
+    return res.status(409).json({ error: 'email already exists' });
+  }
+  const { code, expiresAt } = createOtpForEmail(normalizedEmail);
+  console.log(`[OTP] Generated ${code} for ${normalizedEmail}, expires at ${new Date(expiresAt).toISOString()}`);
+  const payload = {
+    success: true,
+    expiresAt,
+    expiresInMs: Math.max(0, expiresAt - Date.now()),
+  };
+  if (!IS_PRODUCTION) {
+    payload.previewCode = code;
+  }
+  return res.json(payload);
+});
+
 app.post('/api/auth/register', async (req, res) => {
-  const { email, password, name, mobile } = req.body || {};
-  if (!email || !password || !name || !mobile) return res.status(400).json({ error: 'name, email, mobile and password required' });
+  const { email, password, name, mobile, otp } = req.body || {};
+  if (!email || !password || !name || !mobile || !otp) return res.status(400).json({ error: 'name, email, mobile, otp and password required' });
+  const emailNormalized = String(email).trim().toLowerCase();
   const mobileTrim = String(mobile).trim();
   if (!/^[0-9+\-()\s]{8,20}$/.test(mobileTrim)) {
     return res.status(400).json({ error: 'invalid mobile number' });
   }
-  const existing = getUserByEmail(email);
+  const existing = getUserByEmail(emailNormalized);
   if (existing) return res.status(409).json({ error: 'email already exists' });
+  const otpValid = verifyOtpForEmail(emailNormalized, otp);
+  if (!otpValid) {
+    return res.status(400).json({ error: 'invalid or expired otp' });
+  }
   const hash = await bcrypt.hash(password, 10);
-  const user = createUser({ email, password_hash: hash, role: 'user', name, mobile: mobileTrim });
+  const user = createUser({ email: emailNormalized, password_hash: hash, role: 'user', name, mobile: mobileTrim });
   const token = signSession(user);
   setAuthCookie(res, token);
   return res.json({ token, user: { id: user.id, email: user.email, name: user.name || undefined, mobile: user.mobile || undefined, isAdmin: false } });

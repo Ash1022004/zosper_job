@@ -24,9 +24,9 @@ export async function apiLogin(email: string, password: string) {
       throw new Error(errorData.error || 'Login failed');
     }
     return res.json();
-  } catch (error: any) {
+  } catch (error) {
     // Handle network errors
-    if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
+    if (error instanceof Error && (error.message === 'Failed to fetch' || error.name === 'TypeError')) {
       throw new Error('Network error: Could not connect to server');
     }
     throw error;
@@ -57,7 +57,7 @@ export async function apiMe() {
       return null;
     }
     return res.json();
-  } catch (error: any) {
+  } catch (error) {
     console.log('[API] apiMe error:', error);
     // Network errors are expected when not authenticated
     return null;
@@ -96,12 +96,12 @@ async function api<T>(endpoint: string, options?: RequestInit): Promise<T> {
 }
 
 export const authApi = {
-  register: async (email: string, password: string, name: string, mobile: string): Promise<AuthResponse> => {
+  register: async (email: string, password: string, name: string, mobile: string, otp: string): Promise<AuthResponse> => {
     const res = await fetch(`${API_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ email, password, name, mobile }),
+      body: JSON.stringify({ email, password, name, mobile, otp }),
     });
     if (!res.ok) {
       const error = await res.json().catch(() => ({ error: res.statusText }));
@@ -119,6 +119,19 @@ export const authApi = {
     if (!res.ok) {
       const error = await res.json().catch(() => ({ error: res.statusText }));
       throw new Error(error.error || 'Login failed');
+    }
+    return res.json();
+  },
+  sendOtp: async (email: string) => {
+    const res = await fetch(`${API_URL}/api/auth/send-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email }),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(error.error || 'Failed to send OTP');
     }
     return res.json();
   },

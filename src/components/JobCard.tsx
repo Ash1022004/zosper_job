@@ -2,7 +2,7 @@ import { Job } from '@/types/job';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Briefcase, Calendar, DollarSign } from 'lucide-react';
+import { MapPin, Briefcase, Calendar, IndianRupee } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface JobCardProps {
@@ -11,6 +11,12 @@ interface JobCardProps {
 }
 
 export const JobCard = ({ job, onViewDetails }: JobCardProps) => {
+  const salaryLabel = job.salary?.trim();
+  const salaryDisplay = salaryLabel
+    ? /₹|rs|inr/i.test(salaryLabel)
+      ? salaryLabel
+      : `₹${salaryLabel}`
+    : '';
   return (
     <Card className="group p-6 transition-all duration-300 hover:shadow-[var(--shadow-card-hover)] bg-gradient-to-br from-card to-muted/20 border-border/50">
       <div className="flex flex-col gap-4">
@@ -37,10 +43,10 @@ export const JobCard = ({ job, onViewDetails }: JobCardProps) => {
             <Briefcase className="w-4 h-4 text-primary" />
             <span>{job.experience}</span>
           </div>
-          {job.salary && (
+          {salaryDisplay && (
             <div className="flex items-center gap-2 text-muted-foreground">
-              <DollarSign className="w-4 h-4 text-secondary" />
-              <span className="font-semibold text-secondary">{job.salary}</span>
+              <IndianRupee className="w-4 h-4 text-secondary" />
+              <span className="font-semibold text-secondary">{salaryDisplay}</span>
             </div>
           )}
           <div className="flex items-center gap-2 text-muted-foreground">
