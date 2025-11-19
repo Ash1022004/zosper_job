@@ -150,8 +150,17 @@ function setAuthCookie(res, token) {
 
 app.post('/api/auth/send-otp', async (req, res) => {
   const { mobile } = req.body || {};
+  if (!mobile || typeof mobile !== 'string') {
+    console.log('[OTP] Invalid mobile input:', mobile);
+    return res.status(400).json({ error: 'valid mobile number required' });
+  }
   const normalizedMobile = normalizeMobile(mobile);
-  if (!normalizedMobile || normalizedMobile.length < 8) {
+  console.log('[OTP] Received mobile:', mobile, 'Normalized:', normalizedMobile);
+  
+  // Validate: should have at least 10 digits (for international numbers)
+  const digitCount = normalizedMobile.replace(/\D/g, '').length;
+  if (!normalizedMobile || digitCount < 10) {
+    console.log('[OTP] Mobile validation failed - digit count:', digitCount);
     return res.status(400).json({ error: 'valid mobile number required' });
   }
 

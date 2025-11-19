@@ -159,9 +159,13 @@ function verifyOtpForEmail(rawEmail, submittedCode) {
 function normalizeMobile(mobile = '') {
   // Remove all non-digit characters except +
   let cleaned = String(mobile).trim();
-  // If it doesn't start with +, assume it's a local number and might need country code
-  // For now, just clean it and return
-  return cleaned.replace(/[^\d+]/g, '');
+  // Keep only digits and + sign
+  cleaned = cleaned.replace(/[^\d+]/g, '');
+  // Ensure + is only at the start if present
+  if (cleaned.includes('+') && !cleaned.startsWith('+')) {
+    cleaned = '+' + cleaned.replace(/\+/g, '');
+  }
+  return cleaned;
 }
 
 // For mobile OTP, we'll use Twilio Verify API which handles OTP generation and verification
