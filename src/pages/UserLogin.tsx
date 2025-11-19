@@ -54,20 +54,22 @@ const UserLogin = () => {
   };
 
   const handleSendOtp = async () => {
-    if (!mobile.trim()) {
-      toast({ title: 'Enter mobile number first', variant: 'destructive' });
+    if (!email.trim()) {
+      toast({ title: 'Enter email first', variant: 'destructive' });
       return;
     }
     try {
       setSendingOtp(true);
-      const response = await authApi.sendOtp(mobile.trim());
+      const response = await authApi.sendOtp(email.trim());
       setOtpSent(true);
-      // Twilio Verify doesn't return expiresInMs, so set a default timer (5 minutes = 300 seconds)
-      const expiresInSeconds = response?.expiresInMs ? Math.round(response.expiresInMs / 1000) : 300;
+      const expiresInSeconds = Math.round((response?.expiresInMs ?? 60000) / 1000);
       setOtpTimer(expiresInSeconds);
+      if (response?.previewCode) {
+        setOtp(response.previewCode);
+      }
       toast({
         title: 'OTP sent',
-        description: 'Check your mobile for the verification code',
+        description: response?.previewCode ? `Dev preview OTP: ${response.previewCode}` : 'Check your email for the verification code',
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to send OTP';
@@ -123,7 +125,7 @@ const UserLogin = () => {
                     variant="outline"
                     size="sm"
                     onClick={handleSendOtp}
-                    disabled={sendingOtp || !mobile.trim() || otpTimer > 0}
+                    disabled={sendingOtp || !email.trim() || otpTimer > 0}
                   >
                     {sendingOtp ? 'Sending...' : otpTimer > 0 ? `Resend in ${otpTimer}s` : otpSent ? 'Resend OTP' : 'Send OTP'}
                   </Button>
@@ -137,7 +139,7 @@ const UserLogin = () => {
                   onChange={(e) => setOtp(e.target.value)}
                   required
                 />
-                <p className="text-xs text-muted-foreground">Verify your mobile number with the OTP before completing signup.</p>
+                <p className="text-xs text-muted-foreground">Verify your email with the OTP before completing signup.</p>
               </div>
             )}
             <Button className="w-full" type="submit">{isRegister ? 'Create Account' : 'Sign in'}</Button>

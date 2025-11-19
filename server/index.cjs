@@ -4,24 +4,33 @@ const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
-const twilio = require('twilio');
-const { getUserByEmail, getUserByMobile, getAllUsers, createUser, ensureAdmin, trackLogin, trackApplication, getAnalyticsSummary, createOtpForEmail, verifyOtpForEmail, normalizeMobile, createOtpForMobile } = require('./store.cjs');
+const { getUserByEmail, createUser, ensureAdmin, trackLogin, trackApplication, getAnalyticsSummary, createOtpForEmail, verifyOtpForEmail } = require('./store.cjs');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
 const ORIGIN = process.env.ORIGIN || 'http://localhost:8080';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production' || ORIGIN.startsWith('https://');
 
-// Twilio Verify API configuration (for SMS OTP)
-const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
-const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_VERIFY_SERVICE_SID = process.env.TWILIO_VERIFY_SERVICE_SID;
+// Brevo (Sendinblue) SMTP configuration (for Email OTP)
+const SMTP_HOST = process.env.SMTP_HOST || 'smtp-relay.brevo.com';
+const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
+const SMTP_USER = process.env.SMTP_USER;
+const SMTP_PASS = process.env.SMTP_PASS;
+const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER;
 
-let twilioClient = null;
-if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_VERIFY_SERVICE_SID) {
-  twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
-  console.log('[OTP] Twilio Verify configured for SMS OTP');
+let otpTransport = null;
+if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
+  otpTransport = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_PORT === 465,
+    auth: {
+      user: SMTP_USER,
+      pass: SMTP_PASS,
+    },
+  });
+  console.log('[OTP] Email transport configured for', SMTP_HOST);
 } else {
-  console.warn('[OTP] Twilio not fully configured; SMS OTP will not work. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VERIFY_SERVICE_SID.');
+  console.warn('[OTP] SMTP not fully configured; OTP emails will not be sent. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM.');
 }
 
 // Support multiple origins (comma-separated)
@@ -148,121 +157,69 @@ function setAuthCookie(res, token) {
   console.log('[AUTH] Response headers - Set-Cookie:', res.getHeader('Set-Cookie'));
 }
 
-app.post('/api/auth/send-otp', async (req, res) => {
-  const { mobile } = req.body || {};
-  if (!mobile || typeof mobile !== 'string') {
-    console.log('[OTP] Invalid mobile input:', mobile);
-    return res.status(400).json({ error: 'valid mobile number required' });
+app.post('/api/auth/send-otp', (req, res) => {
+  const { email } = req.body || {};
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!normalizedEmail) return res.status(400).json({ error: 'email required' });
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailPattern.test(normalizedEmail)) {
+    return res.status(400).json({ error: 'invalid email address' });
   }
-  const normalizedMobile = normalizeMobile(mobile);
-  console.log('[OTP] Received mobile:', mobile, 'Normalized:', normalizedMobile);
-  
-  // Validate: should have at least 10 digits (for international numbers)
-  const digitCount = normalizedMobile.replace(/\D/g, '').length;
-  if (!normalizedMobile || digitCount < 10) {
-    console.log('[OTP] Mobile validation failed - digit count:', digitCount);
-    return res.status(400).json({ error: 'valid mobile number required' });
+  if (getUserByEmail(normalizedEmail)) {
+    return res.status(409).json({ error: 'email already exists' });
+  }
+  const { code, expiresAt } = createOtpForEmail(normalizedEmail);
+  console.log(`[OTP] Generated ${code} for ${normalizedEmail}, expires at ${new Date(expiresAt).toISOString()}`);
+
+  if (!otpTransport) {
+    console.warn('[OTP] Attempted to send OTP but SMTP is not configured');
+    return res.status(500).json({ error: 'otp email service not configured' });
   }
 
-  // Check if user with this mobile already exists
-  if (getUserByMobile(normalizedMobile)) {
-    return res.status(409).json({ error: 'mobile number already exists' });
-  }
+  const mailOptions = {
+    from: SMTP_FROM,
+    to: normalizedEmail,
+    subject: 'Your Zosper verification code',
+    text: `Your verification code is ${code}. It is valid for 5 minutes.\n\nIf you did not request this code, you can ignore this email.`,
+  };
 
-  if (!twilioClient) {
-    console.warn('[OTP] Attempted to send OTP but Twilio is not configured');
-    return res.status(500).json({ error: 'otp sms service not configured' });
-  }
-
-  try {
-    // Ensure mobile number has country code format (E.164)
-    let phoneNumber = normalizedMobile;
-    if (!phoneNumber.startsWith('+')) {
-      // If no country code, assume it's an Indian number and add +91
-      if (phoneNumber.length === 10 && (phoneNumber.startsWith('9') || phoneNumber.startsWith('8') || phoneNumber.startsWith('7') || phoneNumber.startsWith('6'))) {
-        phoneNumber = '+91' + phoneNumber;
-      } else {
-        return res.status(400).json({ error: 'mobile number must include country code (e.g., +91XXXXXXXXXX)' });
-      }
+  otpTransport.sendMail(mailOptions, (err) => {
+    if (err) {
+      console.error('[OTP] Failed to send email:', err);
+      return res.status(500).json({ error: 'failed to send otp email' });
     }
-
-    console.log(`[OTP] Sending SMS OTP to ${phoneNumber}`);
-    
-    const verification = await twilioClient.verify.v2
-      .services(TWILIO_VERIFY_SERVICE_SID)
-      .verifications
-      .create({ to: phoneNumber, channel: 'sms' });
-
-    console.log(`[OTP] Twilio verification created: ${verification.sid} for ${phoneNumber}, status: ${verification.status}`);
 
     const payload = {
       success: true,
-      verificationSid: verification.sid,
-      status: verification.status,
+      expiresAt,
+      expiresInMs: Math.max(0, expiresAt - Date.now()),
     };
-    
+    if (!IS_PRODUCTION) {
+      payload.previewCode = code;
+    }
     return res.json(payload);
-  } catch (err) {
-    console.error('[OTP] Failed to send SMS via Twilio:', err);
-    return res.status(500).json({ error: 'failed to send otp sms', details: err.message });
-  }
+  });
 });
 
 app.post('/api/auth/register', async (req, res) => {
-  const { email, password, name, mobile, otp, verificationSid } = req.body || {};
+  const { email, password, name, mobile, otp } = req.body || {};
   if (!email || !password || !name || !mobile || !otp) return res.status(400).json({ error: 'name, email, mobile, otp and password required' });
   const emailNormalized = String(email).trim().toLowerCase();
-  const mobileNormalized = normalizeMobile(mobile);
-  if (!mobileNormalized || mobileNormalized.length < 8) {
+  const mobileTrim = String(mobile).trim();
+  if (!/^[0-9+\-()\s]{8,20}$/.test(mobileTrim)) {
     return res.status(400).json({ error: 'invalid mobile number' });
   }
-  
-  // Check if email or mobile already exists
-  const existingByEmail = getUserByEmail(emailNormalized);
-  if (existingByEmail) return res.status(409).json({ error: 'email already exists' });
-  const existingByMobile = getUserByMobile(mobileNormalized);
-  if (existingByMobile) return res.status(409).json({ error: 'mobile number already exists' });
-
-  // Verify OTP using Twilio Verify API
-  if (!twilioClient) {
-    return res.status(500).json({ error: 'otp verification service not configured' });
+  const existing = getUserByEmail(emailNormalized);
+  if (existing) return res.status(409).json({ error: 'email already exists' });
+  const otpValid = verifyOtpForEmail(emailNormalized, otp);
+  if (!otpValid) {
+    return res.status(400).json({ error: 'invalid or expired otp' });
   }
-
-  try {
-    // Ensure mobile number has country code format (E.164)
-    let phoneNumber = mobileNormalized;
-    if (!phoneNumber.startsWith('+')) {
-      // If no country code, assume it's an Indian number and add +91
-      if (phoneNumber.length === 10) {
-        phoneNumber = '+91' + phoneNumber;
-      } else {
-        return res.status(400).json({ error: 'mobile number must include country code (e.g., +91XXXXXXXXXX)' });
-      }
-    }
-
-    console.log(`[OTP] Verifying OTP for ${phoneNumber}, code: ${otp}`);
-    
-    const verificationCheck = await twilioClient.verify.v2
-      .services(TWILIO_VERIFY_SERVICE_SID)
-      .verificationChecks
-      .create({ to: phoneNumber, code: otp });
-
-    console.log(`[OTP] Twilio verification check: ${verificationCheck.sid}, status: ${verificationCheck.status}`);
-
-    if (verificationCheck.status !== 'approved') {
-      return res.status(400).json({ error: 'invalid or expired otp', status: verificationCheck.status });
-    }
-
-    // OTP verified successfully, create user
-    const hash = await bcrypt.hash(password, 10);
-    const user = createUser({ email: emailNormalized, password_hash: hash, role: 'user', name, mobile: mobileNormalized });
-    const token = signSession(user);
-    setAuthCookie(res, token);
-    return res.json({ token, user: { id: user.id, email: user.email, name: user.name || undefined, mobile: user.mobile || undefined, isAdmin: false } });
-  } catch (err) {
-    console.error('[OTP] Failed to verify OTP via Twilio:', err);
-    return res.status(500).json({ error: 'failed to verify otp', details: err.message });
-  }
+  const hash = await bcrypt.hash(password, 10);
+  const user = createUser({ email: emailNormalized, password_hash: hash, role: 'user', name, mobile: mobileTrim });
+  const token = signSession(user);
+  setAuthCookie(res, token);
+  return res.json({ token, user: { id: user.id, email: user.email, name: user.name || undefined, mobile: user.mobile || undefined, isAdmin: false } });
 });
 
 app.post('/api/auth/login', async (req, res) => {

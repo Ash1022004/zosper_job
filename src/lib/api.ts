@@ -122,12 +122,12 @@ export const authApi = {
     }
     return res.json();
   },
-  sendOtp: async (mobile: string) => {
+  sendOtp: async (email: string) => {
     const res = await fetch(`${API_URL}/api/auth/send-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ mobile }),
+      body: JSON.stringify({ email }),
     });
     if (!res.ok) {
       const error = await res.json().catch(() => ({ error: res.statusText }));
