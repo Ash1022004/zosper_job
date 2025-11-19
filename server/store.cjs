@@ -40,6 +40,12 @@ function getUserByEmail(email) {
   return getAllUsers().find(u => normalizeEmail(u.email) === emailLower) || null;
 }
 
+function getUserByMobile(mobile) {
+  const mobileNormalized = normalizeMobile(mobile);
+  if (!mobileNormalized) return null;
+  return getAllUsers().find(u => normalizeMobile(u.mobile) === mobileNormalized) || null;
+}
+
 function createUser({ email, password_hash, role, name, mobile }) {
   const users = getAllUsers();
   const id = users.length ? Math.max(...users.map(u => u.id || 0)) + 1 : 1;
@@ -150,6 +156,39 @@ function verifyOtpForEmail(rawEmail, submittedCode) {
   return true;
 }
 
+function normalizeMobile(mobile = '') {
+  // Remove all non-digit characters except +
+  let cleaned = String(mobile).trim();
+  // If it doesn't start with +, assume it's a local number and might need country code
+  // For now, just clean it and return
+  return cleaned.replace(/[^\d+]/g, '');
+}
+
+// For mobile OTP, we'll use Twilio Verify API which handles OTP generation and verification
+// So we don't need to store OTPs locally, but we can track verification sessions
+const pendingMobileVerifications = new Map(); // mobile -> { verificationSid, expiresAt }
+
+function createOtpForMobile(rawMobile) {
+  const mobile = normalizeMobile(rawMobile);
+  if (!mobile || mobile.length < 8) {
+    throw new Error('Invalid mobile number for OTP generation');
+  }
+  // With Twilio Verify, we don't generate the code here
+  // This function is kept for compatibility but the actual OTP is handled by Twilio
+  const expiresAt = Date.now() + OTP_TTL_MS;
+  return { mobile, expiresAt };
+}
+
+function verifyOtpForMobile(rawMobile, submittedCode) {
+  // With Twilio Verify API, verification is done via API call, not locally
+  // This function is kept for compatibility but actual verification happens in the endpoint
+  const mobile = normalizeMobile(rawMobile);
+  const code = String(submittedCode || '').trim();
+  if (!mobile || code.length === 0) return false;
+  // Actual verification will be done via Twilio API in the endpoint
+  return false; // Always return false here, real verification in endpoint
+}
+
 function getAnalyticsSummary() {
   const analytics = getAnalytics();
   const users = getAllUsers();
@@ -219,7 +258,9 @@ function getAnalyticsSummary() {
 }
 
 module.exports = { 
-  getUserByEmail, 
+  getUserByEmail,
+  getUserByMobile,
+  getAllUsers,
   createUser, 
   ensureAdmin,
   trackLogin,
@@ -228,5 +269,8 @@ module.exports = {
   getAnalyticsSummary,
   createOtpForEmail,
   verifyOtpForEmail,
+  normalizeMobile,
+  createOtpForMobile,
+  verifyOtpForMobile,
 };
 
