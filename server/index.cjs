@@ -10,10 +10,10 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
 const ORIGIN = process.env.ORIGIN || 'http://localhost:8080';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production' || ORIGIN.startsWith('https://');
 
-// Brevo (Sendinblue) SMTP configuration (for Email OTP)
-const SMTP_HOST = process.env.SMTP_HOST || 'smtp-relay.brevo.com';
+// Gmail SMTP configuration (for Email OTP)
+const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
 const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
-const SMTP_USER = process.env.SMTP_USER;
+const SMTP_USER = process.env.SMTP_USER || 'ac300765@gmail.com';
 const SMTP_PASS = process.env.SMTP_PASS;
 const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER;
 
@@ -22,15 +22,18 @@ if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
   otpTransport = nodemailer.createTransport({
     host: SMTP_HOST,
     port: SMTP_PORT,
-    secure: SMTP_PORT === 465,
+    secure: SMTP_PORT === 465, // true for 465, false for other ports
     auth: {
       user: SMTP_USER,
-      pass: SMTP_PASS,
+      pass: SMTP_PASS, // Gmail App Password (not regular password)
     },
+    connectionTimeout: 10000, // 10 seconds
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
   });
-  console.log('[OTP] Email transport configured for', SMTP_HOST);
+  console.log('[OTP] Email transport configured for Gmail:', SMTP_USER);
 } else {
-  console.warn('[OTP] SMTP not fully configured; OTP emails will not be sent. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM.');
+  console.warn('[OTP] SMTP not fully configured; OTP emails will not be sent. Set SMTP_PASS (Gmail App Password).');
 }
 
 // Support multiple origins (comma-separated)
