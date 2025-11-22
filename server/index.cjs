@@ -3,43 +3,23 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const { getUserByEmail, createUser, ensureAdmin, trackLogin, trackApplication, getAnalyticsSummary, createOtpForEmail, verifyOtpForEmail } = require('./store.cjs');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
 const ORIGIN = process.env.ORIGIN || 'http://localhost:8080';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production' || ORIGIN.startsWith('https://');
 
-// Gmail SMTP configuration (for Email OTP)
-const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
-const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
-const SMTP_USER = process.env.SMTP_USER || 'ac300765@gmail.com';
-const SMTP_PASS = process.env.SMTP_PASS;
-const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER;
+// Resend API configuration (for Email OTP) - uses HTTPS, not SMTP
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
 
-let otpTransport = null;
-if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
-  otpTransport = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: SMTP_PORT === 465, // true for 465, false for other ports
-    auth: {
-      user: SMTP_USER,
-      pass: SMTP_PASS, // Gmail App Password (not regular password)
-    },
-    connectionTimeout: 30000, // 30 seconds (increased)
-    greetingTimeout: 30000,
-    socketTimeout: 30000,
-    tls: {
-      rejectUnauthorized: false, // Allow self-signed certificates
-      ciphers: 'SSLv3'
-    },
-    debug: true, // Enable debug logging
-    logger: true, // Log to console
-  });
-  console.log('[OTP] Email transport configured for Gmail:', SMTP_USER, 'on port', SMTP_PORT);
+let resendClient = null;
+if (RESEND_API_KEY) {
+  resendClient = new Resend(RESEND_API_KEY);
+  console.log('[OTP] Resend email service configured');
 } else {
-  console.warn('[OTP] SMTP not fully configured; OTP emails will not be sent. Set SMTP_PASS (Gmail App Password).');
+  console.warn('[OTP] Resend not configured; OTP emails will not be sent. Set RESEND_API_KEY and RESEND_FROM_EMAIL.');
 }
 
 // Support multiple origins (comma-separated)
@@ -166,7 +146,7 @@ function setAuthCookie(res, token) {
   console.log('[AUTH] Response headers - Set-Cookie:', res.getHeader('Set-Cookie'));
 }
 
-app.post('/api/auth/send-otp', (req, res) => {
+app.post('/api/auth/send-otp', async (req, res) => {
   const { email } = req.body || {};
   const normalizedEmail = String(email || '').trim().toLowerCase();
   if (!normalizedEmail) return res.status(400).json({ error: 'email required' });
@@ -180,23 +160,25 @@ app.post('/api/auth/send-otp', (req, res) => {
   const { code, expiresAt } = createOtpForEmail(normalizedEmail);
   console.log(`[OTP] Generated ${code} for ${normalizedEmail}, expires at ${new Date(expiresAt).toISOString()}`);
 
-  if (!otpTransport) {
-    console.warn('[OTP] Attempted to send OTP but SMTP is not configured');
+  if (!resendClient) {
+    console.warn('[OTP] Attempted to send OTP but Resend is not configured');
     return res.status(500).json({ error: 'otp email service not configured' });
   }
 
-  const mailOptions = {
-    from: SMTP_FROM,
-    to: normalizedEmail,
-    subject: 'Your Zosper verification code',
-    text: `Your verification code is ${code}. It is valid for 5 minutes.\n\nIf you did not request this code, you can ignore this email.`,
-  };
+  try {
+    const { data, error } = await resendClient.emails.send({
+      from: RESEND_FROM_EMAIL,
+      to: normalizedEmail,
+      subject: 'Your Zosper verification code',
+      text: `Your verification code is ${code}. It is valid for 5 minutes.\n\nIf you did not request this code, you can ignore this email.`,
+    });
 
-  otpTransport.sendMail(mailOptions, (err) => {
-    if (err) {
-      console.error('[OTP] Failed to send email:', err);
-      return res.status(500).json({ error: 'failed to send otp email' });
+    if (error) {
+      console.error('[OTP] Failed to send email via Resend:', error);
+      return res.status(500).json({ error: 'failed to send otp email', details: error.message });
     }
+
+    console.log('[OTP] Email sent successfully via Resend:', data?.id);
 
     const payload = {
       success: true,
@@ -207,7 +189,10 @@ app.post('/api/auth/send-otp', (req, res) => {
       payload.previewCode = code;
     }
     return res.json(payload);
-  });
+  } catch (err) {
+    console.error('[OTP] Failed to send email:', err);
+    return res.status(500).json({ error: 'failed to send otp email', details: err.message });
+  }
 });
 
 app.post('/api/auth/register', async (req, res) => {
