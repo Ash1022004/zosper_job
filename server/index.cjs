@@ -27,11 +27,17 @@ if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
       user: SMTP_USER,
       pass: SMTP_PASS, // Gmail App Password (not regular password)
     },
-    connectionTimeout: 10000, // 10 seconds
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
+    connectionTimeout: 30000, // 30 seconds (increased)
+    greetingTimeout: 30000,
+    socketTimeout: 30000,
+    tls: {
+      rejectUnauthorized: false, // Allow self-signed certificates
+      ciphers: 'SSLv3'
+    },
+    debug: true, // Enable debug logging
+    logger: true, // Log to console
   });
-  console.log('[OTP] Email transport configured for Gmail:', SMTP_USER);
+  console.log('[OTP] Email transport configured for Gmail:', SMTP_USER, 'on port', SMTP_PORT);
 } else {
   console.warn('[OTP] SMTP not fully configured; OTP emails will not be sent. Set SMTP_PASS (Gmail App Password).');
 }
